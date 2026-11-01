@@ -1,0 +1,28 @@
+.container {
+    width: 50%;
+    margin: auto;
+    text-align: center;
+    font-family: Arial, sans-serif;
+}
+form {
+    margin: 20px 0;
+    padding: 15px;
+    border: 1px solid #ccc;
+    border-radius: 5px;
+}
+.form-group {
+    margin: 10px 0;
+}
+input, button {
+    padding: 8px;
+    margin: 5px;
+}
+button {
+    background-color: blue;
+    color: white;
+    border: none;
+    cursor: pointer;
+}
+button:hover {
+    background-color: darkblue;
+}
