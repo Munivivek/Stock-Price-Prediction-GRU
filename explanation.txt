@@ -1,0 +1,236 @@
+
+
+### **1st Block: Importing Required Libraries**
+```python
+import numpy as np
+import pandas as pd
+from sklearn.preprocessing import MinMaxScaler
+from keras.models import Sequential
+from keras.layers import Dense, Dropout, GRU
+from keras.optimizers import SGD
+import tensorflow as tf
+import math
+from sklearn.metrics import mean_absolute_error, mean_squared_error, r2_score
+```
+**Description:**  
+- This block imports essential libraries:
+  - **NumPy & Pandas** for handling numerical and tabular data.
+  - **MinMaxScaler** for normalizing stock prices.
+  - **Keras & TensorFlow** for building and training the GRU model.
+  - **Math & Metrics** for computing evaluation metrics like MSE, RMSE, MAE, and R².
+
+---
+
+### **2nd Block: Importing Matplotlib for Visualization**
+```python
+import matplotlib.pyplot as plt
+plt.style.use('fivethirtyeight')
+```
+**Description:**  
+- Imports `matplotlib.pyplot` for plotting graphs.
+- Uses the 'fivethirtyeight' style for better visualization.
+
+---
+
+### **3rd Block: Loading the Dataset**
+```python
+dataset = pd.read_csv('GOOGL_stock_data.csv', index_col='Date', parse_dates=['Date'])
+```
+**Description:**  
+- Reads the Google stock dataset from a CSV file.
+- Sets the 'Date' column as the index and parses it as a datetime format.
+
+---
+
+### **4th Block: Displaying the First Few Rows**
+```python
+dataset.head()
+```
+**Description:**  
+- Displays the first five rows of the dataset to check its structure.
+
+---
+
+### **5th Block: Checking the Shape of the Dataset**
+```python
+dataset.shape
+```
+**Description:**  
+- Prints the number of rows and columns in the dataset.
+
+---
+
+### **6th Block: Splitting Data into Training & Testing Sets**
+```python
+training_set = dataset[:'2022'].iloc[:,1:2].values
+test_set = dataset['2023':].iloc[:,1:2].values
+```
+**Description:**  
+- Extracts stock prices before 2023 as the **training set**.
+- Extracts stock prices from 2023 onwards as the **test set**.
+- Selects only the second column (possibly 'High' or 'Close' price).
+
+---
+
+### **7th Block: Visualizing Training and Testing Sets**
+```python
+dataset["Close"][:'2022'].plot(figsize=(16,4),legend=True)
+dataset["Close"]['2023':].plot(figsize=(16,4),legend=True)
+plt.legend(['Training set (Before 2023)','Test set (2024 and beyond)'])
+plt.title('GOOGLE stock price')
+plt.show()
+```
+**Description:**  
+- Plots the **closing prices** for training and testing periods in different colors.
+
+---
+
+### **8th Block: Scaling the Training Data**
+```python
+sc = MinMaxScaler(feature_range=(0,1))
+training_set_scaled = sc.fit_transform(training_set)
+```
+**Description:**  
+- Normalizes stock prices to a **range of 0 to 1** using MinMaxScaler to improve model training.
+
+---
+
+### **9th Block: Setting Timestamp Structure**
+```python
+timestamp_structure = 60
+```
+**Description:**  
+- Defines the **time step** of **60 days**, meaning the model will use the past 60 days to predict the next day's stock price.
+
+---
+
+### **10th Block: Creating Training Data Sequences**
+```python
+X_train = []
+y_train = []
+for i in range(timestamp_structure,len(training_set_scaled)):
+    X_train.append(training_set_scaled[i-timestamp_structure:i,0])
+    y_train.append(training_set_scaled[i,0])
+X_train, y_train = np.array(X_train), np.array(y_train)
+```
+**Description:**  
+- Creates **input (X_train)** and **output (y_train)** sequences:
+  - Each `X_train` sample contains **60 days of stock prices**.
+  - Each `y_train` label is the **next day's stock price**.
+
+---
+
+### **11th Block: Reshaping Input for GRU Model**
+```python
+X_train = np.reshape(X_train, (X_train.shape[0],X_train.shape[1],1))
+```
+**Description:**  
+- Reshapes `X_train` into a 3D array `(samples, time steps, features)`, which is required by GRU.
+
+---
+
+### **12th Block: Defining Model Hyperparameters**
+```python
+epochs = 100
+batch_size = 32
+loss = 'mean_squared_error'
+optimizer = 'rmsprop'
+```
+**Description:**  
+- Sets model parameters:
+  - **Epochs:** 100 (number of training iterations).
+  - **Batch size:** 32 (number of samples per batch).
+  - **Loss function:** Mean Squared Error (MSE) for regression.
+  - **Optimizer:** RMSprop.
+
+---
+
+### **13th Block: Building and Training the GRU Model**
+```python
+regressorGRU = Sequential()
+regressorGRU.add(GRU(units=50, return_sequences=True, input_shape=(X_train.shape[1],1), activation='tanh'))
+regressorGRU.add(Dropout(0.2))
+regressorGRU.add(GRU(units=50, return_sequences=True, activation='tanh'))
+regressorGRU.add(Dropout(0.2))
+regressorGRU.add(GRU(units=50, return_sequences=True, activation='tanh'))
+regressorGRU.add(Dropout(0.2))
+regressorGRU.add(GRU(units=50, activation='tanh'))
+regressorGRU.add(Dropout(0.2))
+regressorGRU.add(Dense(units=1))
+regressorGRU.compile(optimizer=optimizer, loss=loss)
+regressorGRU.fit(X_train,y_train,epochs=epochs, batch_size=batch_size)
+```
+**Description:**  
+- Builds a **4-layer GRU** model with **Dropout (20%)** to prevent overfitting.
+- Uses **Tanh activation**.
+- Compiles and trains the model for **100 epochs**.
+
+---
+
+### **14th Block: Preparing Test Data for Prediction**
+```python
+dataset_total = pd.concat((dataset["High"][:'2023'],dataset["High"]['2024':]),axis=0)
+inputs = dataset_total[len(dataset_total)-len(test_set) - timestamp_structure:].values
+inputs = inputs.reshape(-1,1)
+inputs  = sc.transform(inputs)
+```
+**Description:**  
+- Combines the stock price data.
+- Extracts input data for prediction.
+- Reshapes and scales it using MinMaxScaler.
+
+---
+
+### **15th Block: Creating X_test and Making Predictions**
+```python
+X_test = []
+for i in range(timestamp_structure,len(inputs)):
+    X_test.append(inputs[i-timestamp_structure:i,0])
+X_test = np.array(X_test)
+X_test = np.reshape(X_test, (X_test.shape[0],X_test.shape[1],1))
+GRU_predicted_stock_price = regressorGRU.predict(X_test)
+GRU_predicted_stock_price = sc.inverse_transform(GRU_predicted_stock_price)
+```
+**Description:**  
+- Creates **test input sequences**.
+- Reshapes data for GRU model.
+- **Predicts stock prices** using the trained GRU model.
+- **Inverse transforms** results to get actual stock prices.
+
+---
+
+### **16th Block: Plotting Real vs. Predicted Prices**
+```python
+plt.figure(figsize=(10, 5))
+plt.plot(test_set, color='red',label='Real GOOGLE Stock Price')
+plt.plot(GRU_predicted_stock_price, color='blue',label='Predicted GOOGLE Stock Price')
+plt.title('GOOGLE Stock Price Prediction')
+plt.xlabel('Time')
+plt.ylabel('GOOGLE Stock Price')
+plt.legend()
+plt.show()
+```
+**Description:**  
+- Plots **actual vs. predicted** stock prices.
+
+---
+
+### **17th Block: Calculating Model Performance Metrics**
+```python
+mse = mean_squared_error(test_set, GRU_predicted_stock_price)
+rmse = math.sqrt(mse)
+mae = mean_absolute_error(test_set, GRU_predicted_stock_price)
+r2 = r2_score(test_set, GRU_predicted_stock_price)
+```
+**Description:**  
+- Computes **MSE, RMSE, MAE, and R² Score**.
+
+---
+
+### **18th Block: Saving the Model & Scaler**
+```python
+regressorGRU.save('gru_model_finall.keras')
+dump(sc, 'scaler_finall.joblib')
+```
+**Description:**  
+- Saves the trained **GRU model** and **scaler** for future use.
